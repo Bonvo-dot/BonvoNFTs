@@ -3,17 +3,24 @@ import React, { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import nftABI from "../abi/nftABI.json";
 import ContractABI from "../abi/ContractABI.json";
-
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import ContextWeb3 from "./ContextWeb3";
 import { contractAddress } from "./AddPropertyForm";
 import { useCallback } from "react";
-import { sendNftToDest } from "../utils/SendNFT";
+import {
+  sendNftBack,
+  sendNftToDest,
+  updateContractsOnChainConfig,
+} from "../utils/SendNFT";
 
 export const NFTcontractAddress = utils.getAddress(
   "0xa198d69Aae7c1cC14E30De7036ca5BEdbd7B6941"
 );
-
-const API_KEY = "5N99J7JV1CY9FIDB54MI2961WSUMQN677P";
+const NFTLinkerAddress = utils.getAddress(
+  "0x84c4cc1552e65a1ab2b3c1847c0f239a7d4dfca8"
+);
+const chains = require("../config/testnet.json");
 
 export const MyProperties = ({ user }) => {
   let publicUrl = process.env.PUBLIC_URL + "/";
@@ -27,21 +34,32 @@ export const MyProperties = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [txhash, setTxhash] = useState("");
   const [owner, setOwner] = useState("");
+  const [hasTransfer, setHasTransfer] = useState("");
   const [destTxHash, setDestTxHash] = useState("");
   const request = `https://api-moonbase.moonscan.io/api?module=account&action=tokennfttx&address=${state.address}&startblock=0&endblock=999999999&sort=asc`;
   useEffect(() => {
     const fetchProperties = async () => {
       if (state.address?.length > 0) {
         let tokenIds = [];
+        let tokenIds2 = [];
         await fetch(request)
           .then((res) => res.json())
           .then((data) => {
+            let allTokens = data.result;
+            let hasTransfer = allTokens.filter(
+              (item) =>
+                utils.getAddress(item.contractAddress) === NFTcontractAddress &&
+                item.from === state.address
+            );
+            if (hasTransfer.length > 0) {
+              tokenIds2 = hasTransfer.map((item) => item.tokenID);
+              setHasTransfer(tokenIds2);
+            }
             let res = data.result.filter(
               (item) =>
                 utils.getAddress(item.contractAddress) === NFTcontractAddress &&
                 item.to === state.address
             );
-            console.log(res);
             tokenIds = res.map((item) => item.tokenID);
             setTokenId(tokenIds);
             setFetchTokenId(true);
@@ -52,9 +70,6 @@ export const MyProperties = ({ user }) => {
       fetchProperties();
     }
   }, [state.address, request, fetchTokenId, tokenId]);
-
-  console.log(tokenId);
-  console.log(properties);
 
   /* Fetch Asset */
   useEffect(() => {
@@ -76,7 +91,6 @@ export const MyProperties = ({ user }) => {
                 await contract
                   .assetsByTokenId(item)
                   .then(async (tx) => {
-                    console.log(tx);
                     const txAsset = {
                       timestamp: new Date(
                         tx.timestamp.toNumber()
@@ -96,12 +110,10 @@ export const MyProperties = ({ user }) => {
                       image: "",
                     };
                     assets = [...assets, txAsset];
-                    console.log(assets);
                   })
                   .catch((error) => {
                     console.log(error);
                   });
-                console.log(assets);
                 setProperties(assets);
               });
             }
@@ -128,6 +140,7 @@ export const MyProperties = ({ user }) => {
                     },
                     image: "",
                   };
+
                   setProperties((prev) => [...prev, txAsset]);
                 })
                 .catch((error) => {
@@ -175,29 +188,27 @@ export const MyProperties = ({ user }) => {
           !fetchAll &&
           fetchProperties
         ) {
-          console.log(properties);
           let assets = [...properties];
           properties.map(async (item, idx) => {
             await contract.tokenURI(item.tokenId).then(async (tx) => {
               let res = await fetch(tx);
               let data = await res.json();
-              console.log(data);
-              assets[idx].image = data.image;
+              if (data.image.split("/")[0] === "ipfs:") {
+                let ipfs = data.image.split("/")[2];
+                await fetch(
+                  `https://${ipfs}.ipfs.dweb.link/metadata.json`
+                ).then(async (res) => {
+                  let data = await res.json();
+                  let cid = data.image.split("/")[2];
+                  let name = data.image.split("/")[3];
+                  assets[idx].image = `https://${cid}.ipfs.dweb.link/${name}`;
+                });
+              } else {
+                assets[idx].image = data.image;
+              }
             });
-            console.log(assets);
           });
           setProperties(assets);
-          // tokenId.map(async (item, idx) => {
-          //   await contract.tokenURI(item).then(async (tx) => {
-          //     let res = await fetch(tx);
-          //     let data = await res.json();
-          //     console.log(data);
-          //     console.log(properties);
-          //     let newProperties = [...properties];
-          //     newProperties[idx].image = data.image;
-          //     setProperties(newProperties);
-          //   });
-          // });
         }
         if (
           tokenId.length === 1 &&
@@ -221,7 +232,6 @@ export const MyProperties = ({ user }) => {
 
   useEffect(() => {
     if (properties.length > 0 && !fetchAll && fetchTokenId && fetchProperties) {
-      console.log("fetchImages");
       fetchImages();
       if (properties.length === tokenId.length && properties[0].image !== "") {
         setFetchAll(true);
@@ -237,12 +247,38 @@ export const MyProperties = ({ user }) => {
     tokenId,
   ]);
 
+  const moonbeamChain = chains.find((chain) => chain.name === "Moonbeam");
+  const polygonChain = chains.find((chain) => chain.name === "Polygon");
+
   async function handleSendSource(e, tokenId) {
+    updateContractsOnChainConfig(moonbeamChain, state.address);
+    updateContractsOnChainConfig(polygonChain, state.address);
     e.preventDefault();
     setLoading(true);
-
+    const id = toast.loading(
+      "Transacción en progreso. Por favor, espere la confirmación...",
+      {
+        position: "bottom-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      }
+    );
     const onSrcConfirmed = (txhash) => {
       setDestTxHash("");
+      toast.update(id, {
+        render: `
+        Transacción realizada correctamente! 🎉
+        `,
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
+      setLoading(false);
       setTxhash(txhash);
     };
 
@@ -252,6 +288,44 @@ export const MyProperties = ({ user }) => {
     };
 
     await sendNftToDest(onSrcConfirmed, onSent, tokenId);
+  }
+
+  async function handleSendBack(e, tokenId) {
+    e.preventDefault();
+    setLoading(true);
+    const id = toast.loading(
+      "Transacción en progreso. Por favor, espere la confirmación...",
+      {
+        position: "bottom-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      }
+    );
+    const onSrcConfirmed = (txhash) => {
+      setDestTxHash("");
+      toast.update(id, {
+        render: `
+        Transacción realizada correctamente! 🎉
+        `,
+        type: "success",
+        isLoading: false,
+        autoClose: 5000,
+      });
+      setTxhash(txhash);
+      setLoading(false);
+    };
+
+    const onSent = (owner) => {
+      setOwner(owner);
+      setLoading(false);
+    };
+
+    await sendNftBack(onSrcConfirmed, onSent, tokenId);
   }
 
   return (
@@ -290,21 +364,30 @@ export const MyProperties = ({ user }) => {
                     <span>{property?.timestamp}</span>
                   </td>
                   <td className="ltn__my-properties-table-red">
-                    {loading && (
+                    {loading ? (
                       <div
                         className="spinner-border text-primary"
                         role="status"
                       >
                         <span className="sr-only">Loading...</span>
                       </div>
-                    )}
-                    <button
-                      className="btn
+                    ) : hasTransfer.includes(property?.tokenId.toString()) ? (
+                      <button
+                        className="btn
+                      btn-primary btn-sm"
+                        onClick={(e) => handleSendBack(e, property?.tokenId)}
+                      >
+                        Traer de Polygon
+                      </button>
+                    ) : (
+                      <button
+                        className="btn
                     btn-primary btn-sm"
-                      onClick={(e) => handleSendSource(e, property?.tokenId)}
-                    >
-                      Enviar a Polygon
-                    </button>
+                        onClick={(e) => handleSendSource(e, property?.tokenId)}
+                      >
+                        Enviar a Polygon
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -341,6 +424,18 @@ export const MyProperties = ({ user }) => {
             </li>
           </ul>
         </div>
+        <ToastContainer
+          position="bottom-center"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </div>
     </div>
   );

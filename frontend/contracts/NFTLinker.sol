@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.17;
+pragma solidity 0.8.9;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IERC20.sol";
 import {IAxelarGasService} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGasService.sol";
 import {IAxelarGateway} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGateway.sol";
 import {AxelarExecutable} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/executables/AxelarExecutable.sol";
 import {Upgradable} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/upgradables/Upgradable.sol";
 import {StringToAddress, AddressToString} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/StringAddressUtils.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
-contract NftLinker is ERC721, AxelarExecutable, Upgradable {
+contract NftLinker is ERC721URIStorage, AxelarExecutable, Upgradable {
     using StringToAddress for string;
     using AddressToString for address;
 
@@ -33,7 +35,7 @@ contract NftLinker is ERC721, AxelarExecutable, Upgradable {
         chainName = chainName_;
     }
 
-    //The main function users will interract with.
+    //The main function users will interact with.
     function sendNFT(
         address operator,
         uint256 tokenId,
@@ -70,14 +72,16 @@ contract NftLinker is ERC721, AxelarExecutable, Upgradable {
         (
             string memory originalChain,
             address operator,
-            uint256 originalTokenId
-        ) = abi.decode(original[tokenId], (string, address, uint256));
+            uint256 originalTokenId,
+            string memory tokenURI
+        ) = abi.decode(original[tokenId], (string, address, uint256, string));
         //Create the payload.
         bytes memory payload = abi.encode(
             originalChain,
             operator,
             originalTokenId,
-            destinationAddress
+            destinationAddress,
+            tokenURI
         );
         string memory stringAddress = address(this).toString();
         //Pay for gas. We could also send the contract call here but then the sourceAddress will be that of the gas receiver which is a problem later.
@@ -99,12 +103,14 @@ contract NftLinker is ERC721, AxelarExecutable, Upgradable {
         string memory destinationChain,
         address destinationAddress
     ) internal {
+        string memory tokenURI = IERC721Metadata(operator).tokenURI(tokenId);
         //Create the payload.
         bytes memory payload = abi.encode(
             chainName,
             operator,
             tokenId,
-            destinationAddress
+            destinationAddress,
+            tokenURI
         );
         string memory stringAddress = address(this).toString();
         //Pay for gas. We could also send the contract call here but then the sourceAddress will be that of the gas receiver which is a problem later.
@@ -132,8 +138,9 @@ contract NftLinker is ERC721, AxelarExecutable, Upgradable {
             string memory originalChain,
             address operator,
             uint256 tokenId,
-            address destinationAddress
-        ) = abi.decode(payload, (string, address, uint256, address));
+            address destinationAddress,
+            string memory tokenURI
+        ) = abi.decode(payload, (string, address, uint256, address, string));
         //If this is the original chain then we give the NFT locally.
         if (keccak256(bytes(originalChain)) == keccak256(bytes(chainName))) {
             IERC721(operator).transferFrom(
@@ -147,12 +154,14 @@ contract NftLinker is ERC721, AxelarExecutable, Upgradable {
             bytes memory originalData = abi.encode(
                 originalChain,
                 operator,
-                tokenId
+                tokenId,
+                tokenURI
             );
             //Avoids tokenId collisions.
             uint256 newTokenId = uint256(keccak256(originalData));
             original[newTokenId] = originalData;
             _safeMint(destinationAddress, newTokenId);
+            _setTokenURI(newTokenId, tokenURI);
         }
     }
 

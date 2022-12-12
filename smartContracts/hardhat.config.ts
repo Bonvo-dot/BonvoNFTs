@@ -24,7 +24,7 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: process.env.API_KEY_MUMBAI,
-    // apiKey: process.env.MOONBASESCAN_API_KEY,
+    // apiKey: process.env.API_KEY_MOONBEAM,
   },
 };
 

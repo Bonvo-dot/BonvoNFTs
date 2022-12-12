@@ -87,8 +87,6 @@ const AddPropertyForm = () => {
         owner: state.address,
       });
     }
-    console.log(property);
-    console.log(metadata);
   }, [property, state.address, location, metadata]);
 
   const handleChange = (e) => {
@@ -262,26 +260,6 @@ const AddPropertyForm = () => {
     form.append("description", metadata.description);
     form.append("attributes", attributes);
 
-    const uri = await axios
-      .post(`${API_URL}/nft-storage`, form, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      })
-      .then((res) => {
-        console.log(res.data);
-        return res.data;
-      });
-
-    setProperty((prev) => {
-      return {
-        ...prev,
-        images: [uri],
-      };
-    });
-
-    console.log(property);
-
     const id = toast.loading(
       "Transacción en progreso. Por favor, espere la confirmación...",
       {
@@ -295,6 +273,28 @@ const AddPropertyForm = () => {
         theme: "light",
       }
     );
+
+    let sendProperty = property;
+    await axios
+      .post(`${API_URL}/nft-storage`, form, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
+      .then((res) => {
+        console.log(res.data);
+        setProperty((prev) => {
+          return {
+            ...prev,
+            images: [res.data],
+          };
+        });
+        sendProperty.images = [res.data];
+        return res.data;
+      });
+
+    console.log(sendProperty);
+
     try {
       const { ethereum } = window;
       if (ethereum) {
@@ -306,34 +306,33 @@ const AddPropertyForm = () => {
           signer
         );
 
-        await contract
-          .createAsset(property)
-          .then((tx) => {
-            console.log(tx);
-            toast.update(id, {
-              render: `
-              Transacción realizada correctamente! 🎉
-              `,
-              type: "success",
-              isLoading: false,
-              autoClose: 5000,
-            });
+        const res = await (
+          await contract.createAsset(sendProperty).then((tx) => {
             toast(<MessageToast txHash={tx.hash} />, {
               autoClose: 5000,
             });
           })
-          .catch((error) => {
-            console.log(error);
-          });
+        ).wait();
+        // .then((tx) => {
+        //   console.log(tx);
+        // })
+        // .catch((error) => {
+        //   console.log(error);
+        // })
+
+        toast.update(id, {
+          render: `
+          Transacción realizada correctamente! 🎉
+          `,
+          type: "success",
+          isLoading: false,
+          autoClose: 5000,
+        });
+        console.log(res);
       }
       handleReset();
     } catch (error) {
       console.log("error", error);
-      toast.update(id, {
-        render: "Algo salió mal",
-        type: "error",
-        isLoading: false,
-      });
     }
     return;
   };

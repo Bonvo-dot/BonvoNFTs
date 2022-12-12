@@ -1,12 +1,14 @@
 /* eslint-disable no-undef */
-import { Contract, getDefaultProvider } from "ethers";
+import { Contract, getDefaultProvider, providers } from "ethers";
 import {
   AxelarQueryAPI,
   Environment,
   EvmChain,
   GasToken,
 } from "@axelar-network/axelarjs-sdk";
-
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import MessageToast from "../moonbeam/MessageToast";
 import NftLinker from "../abi/NFTLinker.json";
 import ERC721 from "../abi/nftABI.json";
 import { wallet } from "../config/constants";
@@ -20,30 +22,18 @@ const chains = require("../config/testnet.json");
 const moonbeamChain = chains.find((chain) => chain.name === "Moonbeam");
 const polygonChain = chains.find((chain) => chain.name === "Polygon");
 
-export function updateContractsOnChainConfig(chain) {
-  chain.wallet = wallet.connect(getDefaultProvider(chain.rpc));
-  chain.contract = new Contract(chain.nftLinker, NftLinker, chain.wallet);
-  chain.erc721 = new Contract(chain.erc721, ERC721, chain.wallet);
+export function updateContractsOnChainConfig(chain, address) {
+  const { ethereum } = window;
+  if (ethereum) {
+    const provider = new providers.Web3Provider(ethereum);
+    chain.wallet = provider.getSigner(address);
+    chain.erc721 = new Contract(chain.erc721, ERC721, chain.wallet);
+    chain.contract = new Contract(chain.nftLinker, NftLinker, chain.wallet);
+  }
 }
-
-updateContractsOnChainConfig(moonbeamChain);
-updateContractsOnChainConfig(polygonChain);
 
 export async function sendNftToDest(onSrcConfirmed, onSent, tokenId) {
   const owner = await ownerOf(moonbeamChain, tokenId);
-  // const approve = await (
-  //   await moonbeamChain.erc721
-  //     .approve(moonbeamChain.contract.address, owner.tokenId)
-  //     .then((res) => {
-  //       console.log(res);
-  //       return res;
-  //     })
-  //     .catch((err) => {
-  //       console.log(err);
-  //     })
-  // ).wait();
-
-  // console.log(approve);
 
   console.log({ owner });
 
@@ -89,6 +79,9 @@ export async function sendNftToDest(onSrcConfirmed, onSent, tokenId) {
         )
         .then((res) => {
           console.log(res);
+          toast(<MessageToast txHash={res.hash} />, {
+            autoClose: 5000,
+          });
           return res;
         })
         .catch((err) => {
@@ -110,55 +103,84 @@ export async function sendNftToDest(onSrcConfirmed, onSent, tokenId) {
       break;
     }
 
-    await sleep(2000);
+    await sleep(10000);
   }
 
   console.log("--- Then ---");
   await print();
 }
 
-// export async function sendNftBack(onSrcConfirmed, onSent) {
-//   const owner = await ownerOf();
+export async function sendNftBack(onSrcConfirmed, onSent, tokenId) {
+  const owner = await ownerOf(polygonChain, tokenId);
 
-//   console.log("--- Initially ---", owner);
-//   await print();
+  console.log({ owner });
 
-//   const gasFee = getGasFee(
-//     EvmChain.POLYGON,
-//     EvmChain.MOONBEAM,
-//     GasToken.MATIC
-//   );
+  console.log("--- Initially ---", tokenId);
+  await print();
 
-//   const tx = await (
-//     await moonbeamChain.contract.sendNFT(
-//       moonbeamChain.contract.address,
-//       owner.tokenId,
-//       avalancheChain.name,
-//       wallet.address,
-//       {
-//         value: gasFee,
-//       }
-//     )
-//   ).wait();
+  const gasFee = await getGasFee(
+    EvmChain.POLYGON,
+    EvmChain.MOONBEAM,
+    GasToken.MATIC
+  ).then((res) => {
+    console.log(res);
+    return res;
+  });
 
-//   console.log("tx back", tx);
+  await (
+    await polygonChain.erc721.approve(
+      polygonChain.contract.address,
+      owner.tokenId
+    )
+  ).wait();
+  console.log(polygonChain.erc721, tokenId, polygonChain.name, wallet.address, {
+    value: gasFee,
+  });
 
-//   onSrcConfirmed(tx.transactionHash);
+  try {
+    const tx = await (
+      await polygonChain.contract
+        .sendNFT(
+          polygonChain.erc721.address,
+          tokenId,
+          polygonChain.name,
+          wallet.address,
+          {
+            value: gasFee,
+          }
+        )
+        .then((res) => {
+          console.log(res);
+          toast(<MessageToast txHash={res.hash} />, {
+            autoClose: 5000,
+          });
+          return res;
+        })
+        .catch((err) => {
+          console.log(err);
+        })
+    ).wait();
 
-//   while (true) {
-//     const owner = await ownerOf();
+    console.log("tx", tx);
+    onSrcConfirmed(tx.transactionHash);
+  } catch (err) {
+    console.log(err);
+  }
 
-//     if (owner.chain === avalancheChain.name) {
-//       onSent(owner);
-//       break;
-//     }
+  while (true) {
+    const owner = await ownerOf();
 
-//     await sleep(2000);
-//   }
+    if (owner.chain === moonbeamChain.name) {
+      onSent(owner);
+      break;
+    }
 
-//   console.log("--- Then ---");
-//   await print();
-// }
+    await sleep(10000);
+  }
+
+  console.log("--- Then ---");
+  await print();
+}
 
 export function truncatedAddress(address) {
   return (
