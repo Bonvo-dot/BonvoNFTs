@@ -1,30 +1,30 @@
-﻿1. Project application.
+## 1. Project application.
 
 Axelar’s General Message Passing (GMP) feature
 
   
 
-2. Github Link.
+## 2. Github Link.
 
 https://github.com/Bonvo-dot/BonvoNFTs
 
   
 
-3. Video Link.
+## 3. Video Link.
 
 https://youtu.be/9WVjN-f5W1g
 
   
 
-4. Team name.
+## 4. Team name.
 
 BONVO NFT
 
   
 
-5. Project description.
+## 5. Project description.
 
-BONVO PROPERTIES NFT
+##### BONVO PROPERTIES NFT
 
 Bonvo Properties NFT, is a decentralized app with a variety of features. The purpose of the platform is to bring actualized real estate information in real time to the user.
 
@@ -39,18 +39,16 @@ Every time that the user mint or create a new property, receive BNV tokens as a 
   
   
 
-6. Names of the participants.
+## 6. Names of the participants.
 
-Matias Guagliardo - [matias.guagliardo@gmail.com](mailto:matias.guagliardo@gmail.com) - [https://github.com/Mattteus1](https://github.com/Mattteus1)
+- Matias Guagliardo - [matias.guagliardo@gmail.com](mailto:matias.guagliardo@gmail.com) - [https://github.com/Mattteus1](https://github.com/Mattteus1)
 
-Matías Palomo - [matiaas.p@gmail.com](mailto:matiaas.p@gmail.com) - [https://github.com/Matiaspp96](https://github.com/Matiaspp96)
+- Matías Palomo - [matiaas.p@gmail.com](mailto:matiaas.p@gmail.com) - [https://github.com/Matiaspp96](https://github.com/Matiaspp96)
 
-Gustavo Matta. - [linkzelda2016o@gmail.com](mailto:linkzelda2016o@gmail.com) - [https://github.com/BetX19](https://github.com/BetX19)
+- Gustavo Matta. - [linkzelda2016o@gmail.com](mailto:linkzelda2016o@gmail.com) - [https://github.com/BetX19](https://github.com/BetX19)
 
-  
-  
 
-7.Project name.
+## 7.Project name.
 
 BONVO PROPERTIES NFT
 
@@ -70,7 +68,7 @@ BONVO PROPERTIES NFT
   
   
 
-8. Project logo.
+## 8. Project logo.
 
   
   
@@ -98,7 +96,7 @@ BONVO PROPERTIES NFT
   
   
 
-9.Problem description.
+## 9.Problem description.
 
   
 
@@ -107,7 +105,7 @@ The problem lies in the lack of adequate economic incentives for tenants and ten
   
   
 
-10.Solution or how it helps to solve the problem.
+## 10.Solution or how it helps to solve the problem.
 
   
 
@@ -123,7 +121,7 @@ It seeks to encourage the rental or rent of properties of houses or apartments. 
   
   
 
-11. Tech stack
+## 11. Tech stack
 
 -   Backend: - Express.js - Multer - NFT.Storage - Gcloud Storage
     
@@ -136,12 +134,12 @@ Every time a user creates an asset (house to rent for example), the information 
 
   
 
-12. Project demo link (page url)
+## 12. Project demo link (page url)
 
 [https://bonvo-nft.vercel.app/#/](https://bonvo-nft.vercel.app/#/)
 
   
 
-13. Awards, Mentions.
+## 13. Awards, Mentions.
 
 Bonvo NFTs won the 2nd prize in the NFT category, in the first Polkadot Hackathon in Latin America in 2022.
